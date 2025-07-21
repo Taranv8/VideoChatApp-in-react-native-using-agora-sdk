@@ -6,6 +6,9 @@ import {
   TouchableOpacity,
   PermissionsAndroid,
   Platform,
+  TextInput,
+  KeyboardAvoidingView,
+  ScrollView,
 } from 'react-native';
 
 import {
@@ -18,18 +21,17 @@ import {
   RtcConnection,
 } from 'react-native-agora';
 
-const appId = 'e0e08e54d3af4a6282a29873c6c4a7c3';
-const token = '007eJxTYJg5X19Cc1+L/sXMR2/VXnHF3NW/oH3AbrnTN379EMtFt04pMKQapBpYpJqapBgnppkkmhlZGCUaWVqYGyebJZskmicb5zEXZDQEMjIsf+3MwsgAgSA+K0NJYlFiHgMDAFeSH3Q=';
-const channelName = 'taran';
-
 const App = () => {
   const agoraEngineRef = useRef<IRtcEngine | null>(null);
   const [isJoined, setIsJoined] = useState(false);
   const [remoteUid, setRemoteUid] = useState<number | null>(null);
   const [message, setMessage] = useState('');
-  // Removed localUid state since we'll use 0 for local video
 
-  // Cleanup on unmount
+  // User-editable states
+  const [appId, setAppId] = useState('e0e08e54d3af4a6282a29873c6c4a7c3');
+  const [token, setToken] = useState('007eJxTYPi2p9Hs+BMdlW6hvg0nFBQFglZW++8JnvuQvTk0tcxjppECQ6pBqoFFqqlJinFimkmimZGFUaKRpYW5cbJZskmiebLxNcvKjIZARobEqDWMjAwQCOKzMpQkFiXmMTAAAB0jHpQ=');
+  const [channelName, setChannelName] = useState('taran');
+
   const cleanupAgoraEngine = () => {
     console.log('🧹 Releasing Agora engine...');
     agoraEngineRef.current?.release();
@@ -48,7 +50,6 @@ const App = () => {
     return cleanupAgoraEngine;
   }, []);
 
-  // Request permissions
   const requestPermissions = async () => {
     try {
       await PermissionsAndroid.requestMultiple([
@@ -61,7 +62,6 @@ const App = () => {
     }
   };
 
-  // Initialize Agora
   const initializeAgoraEngine = async () => {
     console.log('⚙️ Initializing Agora engine...');
     agoraEngineRef.current = createAgoraRtcEngine();
@@ -74,7 +74,6 @@ const App = () => {
     console.log('✅ Engine initialized, audio & video enabled');
   };
 
-  // Set up Agora event handlers
   const setupEventHandlers = () => {
     const events: Partial<IRtcEngineEventHandler> = {
       onJoinChannelSuccess: (_connection, uid) => {
@@ -102,7 +101,6 @@ const App = () => {
     console.log('✅ Event handlers registered');
   };
 
-  // Join channel
   const joinChannel = async () => {
     if (isJoined) return;
 
@@ -116,7 +114,7 @@ const App = () => {
     agoraEngineRef.current?.joinChannel(
       token,
       channelName,
-      0,  // Use 0 for local UID
+      0,
       {
         channelProfile: ChannelProfileType.ChannelProfileCommunication,
         clientRoleType: ClientRoleType.ClientRoleBroadcaster,
@@ -124,7 +122,6 @@ const App = () => {
     );
   };
 
-  // Leave channel
   const leaveChannel = () => {
     if (!isJoined) return;
 
@@ -137,32 +134,24 @@ const App = () => {
     console.log('🚀 Left channel & stopped preview');
   };
 
-  // Switch camera
   const switchCamera = () => {
     agoraEngineRef.current?.switchCamera();
   };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
-      {/* Main video area - Always show remote if available */}
+      {/* Main Video Display */}
       {isJoined && remoteUid ? (
-        <RtcSurfaceView
-          canvas={{ uid: remoteUid }}
-          style={{ flex: 1 }}
-        />
+        <RtcSurfaceView canvas={{ uid: remoteUid }} style={{ flex: 1 }} />
       ) : isJoined ? (
-        // Show local preview in main area when alone
-        <RtcSurfaceView
-          canvas={{ uid: 0 }}  // Use 0 for local video
-          style={{ flex: 1 }}
-        />
+        <RtcSurfaceView canvas={{ uid: 0 }} style={{ flex: 1 }} />
       ) : (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <Text style={{ color: '#fff', fontSize: 18 }}>{message || 'Waiting...'}</Text>
         </View>
       )}
 
-      {/* Local video as small PiP - Always show local video when joined */}
+      {/* Local video preview in PiP style */}
       {isJoined && (
         <View style={{
           position: 'absolute',
@@ -177,14 +166,11 @@ const App = () => {
           zIndex: 100,
           elevation: 20,
         }}>
-          <RtcSurfaceView
-            canvas={{ uid: 0 }}  // Always use 0 for local video
-            style={{ flex: 1 }}
-          />
+          <RtcSurfaceView canvas={{ uid: 0 }} style={{ flex: 1 }} />
         </View>
       )}
 
-      {/* Buttons at bottom */}
+      {/* Controls for Leave & Switch */}
       {isJoined && (
         <View style={{
           position: 'absolute',
@@ -222,23 +208,61 @@ const App = () => {
         </View>
       )}
 
-      {/* If not joined, show Join button */}
+      {/* Inputs and Join button when not joined */}
       {!isJoined && (
-        <View style={{ position: 'absolute', bottom: 50, alignSelf: 'center' }}>
-          <TouchableOpacity
-            onPress={joinChannel}
-            style={{
-              backgroundColor: '#1e90ff',
-              paddingHorizontal: 30,
-              paddingVertical: 15,
-              borderRadius: 30
-            }}>
-            <Text style={{ color: '#fff', fontSize: 18 }}>Join Call</Text>
-          </TouchableOpacity>
-        </View>
+        <KeyboardAvoidingView behavior="padding" style={{ padding: 20 }}>
+          <ScrollView contentContainerStyle={{ alignItems: 'center' }}>
+            <TextInput
+              placeholder="App ID"
+              placeholderTextColor="#aaa"
+              style={styles.input}
+              value={appId}
+              onChangeText={setAppId}
+            />
+            <TextInput
+              placeholder="Token"
+              placeholderTextColor="#aaa"
+              style={styles.input}
+              value={token}
+              onChangeText={setToken}
+              multiline
+            />
+            <TextInput
+              placeholder="Channel Name"
+              placeholderTextColor="#aaa"
+              style={styles.input}
+              value={channelName}
+              onChangeText={setChannelName}
+            />
+
+            <TouchableOpacity
+              onPress={joinChannel}
+              style={styles.joinButton}>
+              <Text style={{ color: '#fff', fontSize: 18 }}>Join Call</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </KeyboardAvoidingView>
       )}
     </SafeAreaView>
   );
+};
+
+const styles = {
+  input: {
+    width: '90%',
+    backgroundColor: '#222',
+    color: '#fff',
+    padding: 12,
+    marginVertical: 8,
+    borderRadius: 8,
+  },
+  joinButton: {
+    marginTop: 20,
+    backgroundColor: '#1e90ff',
+    paddingHorizontal: 30,
+    paddingVertical: 15,
+    borderRadius: 30,
+  },
 };
 
 export default App;
